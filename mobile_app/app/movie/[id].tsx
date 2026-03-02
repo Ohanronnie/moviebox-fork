@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, ScrollView, Text, Pressable, ActivityIndicator, Linking, Alert, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, ScrollView, Text, Pressable, ActivityIndicator, Linking, Alert, Platform, StyleSheet } from 'react-native';
 // Removed @react-native-picker/picker as it was reported as not working.
 // Using custom horizontal chips for better reliability and UX.
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useDetails, useRecommendations } from '@/lib/hooks';
 import { api } from '@/lib/api';
-import type { MediaInfoResponse } from '@/lib/types';
+import type { MediaInfoResponse, DownloadItem } from '@/lib/types';
 import { downloadToStorage, getDownloadId } from '@/lib/downloads';
 import { useActiveDownloads } from '@/lib/ActiveDownloadsContext';
 import { PosterCard } from '@/components/PosterCard';
@@ -42,6 +42,9 @@ export default function MovieDetailScreen() {
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadTotalBytes, setDownloadTotalBytes] = useState<number | null>(null);
+  const [availableQualities, setAvailableQualities] = useState<DownloadItem[]>([]);
+  const [selectedQuality, setSelectedQuality] = useState<DownloadItem | null>(null);
+  const [loadingQualities, setLoadingQualities] = useState(false);
   const { addActive, updateProgress, removeActive } = useActiveDownloads();
 
   const currentSeason =
@@ -73,6 +76,55 @@ export default function MovieDetailScreen() {
     }
   };
 
+  // Load available download qualities (per title / episode)
+  // so the user can choose resolution + size before downloading.
+  React.useEffect(() => {
+    if (!url) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        setLoadingQualities(true);
+        const season = isSeries ? selectedSeason : 1;
+        const episode = isSeries ? selectedEpisode : 1;
+        const { data } = await api.get<MediaInfoResponse>('/media-info', {
+          params: { url, is_series: isSeries, season, episode },
+        });
+        if (cancelled) return;
+        const list = data.downloads ?? [];
+        setAvailableQualities(list);
+        if (!list.length) {
+          setSelectedQuality(null);
+          return;
+        }
+        // Default to best resolution if nothing selected
+        if (!selectedQuality) {
+          const best = list.reduce((a, b) =>
+            (b.resolution ?? 0) > (a.resolution ?? 0) ? b : a
+          );
+          setSelectedQuality(best);
+        } else {
+          // Try to keep same resolution if it still exists
+          const match = list.find(
+            (q) =>
+              q.resolution === selectedQuality.resolution && q.size === selectedQuality.size
+          );
+          if (match) setSelectedQuality(match);
+        }
+      } catch {
+        if (!cancelled) {
+          setAvailableQualities([]);
+          setSelectedQuality(null);
+        }
+      } finally {
+        if (!cancelled) setLoadingQualities(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [url, isSeries, selectedSeason, selectedEpisode]);
+
   const handleDownload = async () => {
     if (!subject || !detailPath || !subjectId) return;
     const season = isSeries ? selectedSeason : 1;
@@ -94,32 +146,38 @@ export default function MovieDetailScreen() {
     setDownloadProgress(0);
     setDownloadTotalBytes(null);
     try {
-      const { data } = await api.get<MediaInfoResponse>('/media-info', {
-        params: { url, is_series: isSeries, season, episode },
-      });
-      if (!data.downloads?.length) {
+      // Prefer already loaded qualities, but fall back to fresh media-info if needed.
+      let list = availableQualities;
+      if (!list.length) {
+        const { data } = await api.get<MediaInfoResponse>('/media-info', {
+          params: { url, is_series: isSeries, season, episode },
+        });
+        list = data.downloads ?? [];
+      }
+      if (!list.length) {
         setDownloading(false);
         removeActive(downloadId);
         Alert.alert('No download', 'No download available for this title.');
         return;
       }
-      const best = data.downloads.reduce((a, b) =>
+      const best = list.reduce((a, b) =>
         (b.resolution ?? 0) > (a.resolution ?? 0) ? b : a
       );
-      const totalBytes = best.size ?? 0;
+      const source = selectedQuality ?? best;
+      const totalBytes = source.size ?? 0;
       setDownloadTotalBytes(totalBytes || null);
       addActive(downloadId, title, subtitle, totalBytes || undefined);
       await downloadToStorage(
         {
-          rawMediaUrl: best.url,
+          rawMediaUrl: source.url,
           subjectId,
           detailPath,
           title,
           isSeries,
           season: isSeries ? season : undefined,
           episode: isSeries ? episode : undefined,
-          resolution: best.resolution,
-          size: best.size,
+          resolution: source.resolution,
+          size: source.size,
           coverUrl: imageUrl ?? undefined,
         },
         (p) => {
@@ -220,6 +278,48 @@ export default function MovieDetailScreen() {
           {subject.description ? (
             <Text style={{ color: '#a1a1aa', lineHeight: 24, fontSize: 16, marginBottom: 28, maxWidth: '100%' }} numberOfLines={5} ellipsizeMode="tail">{subject.description}</Text>
           ) : null}
+
+          {/* Download quality selector (reuse chip style from seasons/episodes) */}
+          {availableQualities.length > 0 && (
+            <View style={{ marginBottom: 20 }}>
+              <Text style={{ color: '#fafafa', fontSize: 16, fontWeight: '600', marginBottom: 8 }}>
+                Download quality
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4 }}>
+                {availableQualities.map((q) => {
+                  const isSelected = selectedQuality?.resolution === q.resolution;
+                  const sizeMB = q.size ? q.size / (1024 * 1024) : null;
+                  return (
+                    <Pressable
+                      key={q.resolution}
+                      onPress={() => setSelectedQuality(q)}
+                      style={{
+                        minWidth: 64,
+                        height: 36,
+                        marginRight: 8,
+                        marginBottom: 8,
+                        borderRadius: 9999,
+                        paddingHorizontal: 12,
+                        backgroundColor: isSelected ? '#E11D48' : '#27272a',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: '#fafafa',
+                          fontWeight: '600',
+                          fontSize: 13,
+                        }}
+                      >
+                        {q.resolution}p{sizeMB ? ` · ${sizeMB.toFixed(1)} MB` : ''}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
 
           {isSeries && seasons.length > 0 && (
             <View style={{ marginBottom: 24 }}>
