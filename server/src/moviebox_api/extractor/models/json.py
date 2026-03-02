@@ -137,6 +137,10 @@ class PostListItemSubjectModel(BaseModel):
     subjectId: str
     subjectType: SubjectType
     title: str
+    @property
+    def page_url(self) -> str:
+        """Url to the specific item details page"""
+        return f"{ITEM_DETAILS_PATH}/{self.detailPath}?id={self.subjectId}"
 
     @field_validator("genre", mode="before")
     def validate_genre(value: str) -> list[str]:

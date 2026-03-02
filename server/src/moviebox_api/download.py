@@ -130,12 +130,9 @@ class BaseDownloadableFilesDetail(BaseContentProviderAndHelper):
         Returns:
             t.Dict: File details
         """
-        # Referer should match the details page of the mirror exactly
-        referer_path = self._item.detailPath
-        if not referer_path.startswith("/"):
-            referer_path = f"/{referer_path}"
-        
-        request_header = {"Referer": get_absolute_url(referer_path)}
+        # Referer – match the behavior of the original library and CLI,
+        # which successfully receive non-empty downloads from the upstream.
+        request_header = {"Referer": get_absolute_url(f"/movies/{self._item.detailPath}")}
 
         content = await self.session.get_with_cookies_from_api(
             url=self._url,

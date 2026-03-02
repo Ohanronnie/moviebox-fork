@@ -12,7 +12,6 @@ from httpx._types import (
 )
 
 from moviebox_api.constants import (
-    DEFAULT_REQUEST_HEADERS,
     DOWNLOAD_REQUEST_HEADERS,
     SELECTED_HOST,
 )
@@ -37,7 +36,7 @@ class Session:
 
     def __init__(
         self,
-        headers: ProxyTypes | None = DEFAULT_REQUEST_HEADERS,
+        headers: ProxyTypes | None = DOWNLOAD_REQUEST_HEADERS,
         cookies: CookieTypes | None = request_cookies,
         timeout: TimeoutTypes = DEFAULT_TIMEOUT_CONFIG,
         proxy: ProxyTypes | None = None,

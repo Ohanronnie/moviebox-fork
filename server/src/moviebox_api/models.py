@@ -66,8 +66,18 @@ class ContentSubjectModel(BaseModel):
     # imdbRatingCount: int
 
     @field_validator("genre", mode="before")
-    def validate_genre(value: str) -> list[str]:
-        return value.split(",")
+    def validate_genre(value) -> list[str]:
+        """Ensure genre is always a list of strings.
+
+        Upstream API typically returns a comma-separated string, but some callers
+        (e.g. internal tests) may provide a list instead.
+        """
+        if isinstance(value, list):
+            return [str(v) for v in value]
+        if isinstance(value, str):
+            return [v.strip() for v in value.split(",") if v.strip()]
+        # Fallback: wrap any other type as a single-element list of str
+        return [str(value)]
 
 
 class ContentModel(BaseModel):
@@ -113,8 +123,13 @@ class ContentCategorySubjectsModel(ContentSubjectModel):
     hasResource: bool
 
     @field_validator("subtitles", mode="before")
-    def validate_subtitles(value: str) -> list[str]:
-        return value.split(",")
+    def validate_subtitles(value) -> list[str]:
+        """Normalize subtitles to a list of strings."""
+        if isinstance(value, list):
+            return [str(v) for v in value]
+        if isinstance(value, str):
+            return [v.strip() for v in value.split(",") if v.strip()]
+        return [str(value)]
 
 
 class ContentCategoryModel(BaseModel):
@@ -172,12 +187,19 @@ class SearchResultsItem(ContentSubjectModel):
     imdbRatingCount: int | None = None  # None for TrendingResults
 
     @field_validator("ops", mode="before")
-    def validate_ops(value: str) -> dict:
+    def validate_ops(value) -> dict:
+        if isinstance(value, dict):
+            return value
+        # Accept JSON string or any object that json.loads can handle
         return loads(value)
 
     @field_validator("subtitles", mode="before")
-    def validate_subtitles(value: str) -> list[str]:
-        return value.split(",")
+    def validate_subtitles(value) -> list[str]:
+        if isinstance(value, list):
+            return [str(v) for v in value]
+        if isinstance(value, str):
+            return [v.strip() for v in value.split(",") if v.strip()]
+        return [str(value)]
 
     @property
     def page_url(self) -> str:
