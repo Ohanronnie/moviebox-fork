@@ -19,9 +19,9 @@ class MetadataModel(BaseModel):
     description: str
     image: HttpUrl
     keyWords: list[str]
-    referer: HttpUrl
+    referer: HttpUrl | str | None = None
     title: str
-    url: HttpUrl
+    url: HttpUrl | str | None = None
 
     @field_validator("keyWords", mode="before")
     def validate_genre(value: str) -> list[str]:
@@ -35,11 +35,11 @@ class MetadataModel(BaseModel):
 class PubParamModel(BaseModel):
     """`.resData.pubParam`"""
 
-    isNewUser: bool
-    lang: str
-    referer: HttpUrl
-    uid: str
-    url: HttpUrl
+    isNewUser: bool = False
+    lang: str = "en"
+    referer: HttpUrl | str | None = None
+    uid: str = ""
+    url: HttpUrl | str | None = None
 
     @field_validator("url", mode="before")
     def validate_url(value: str) -> str:
@@ -248,12 +248,12 @@ class ResDataModel(BaseModel):
 
     metadata: MetadataModel
     postList: PostListModel
-    pubParam: PubParamModel
-    referer: HttpUrl
+    pubParam: PubParamModel | None = None
+    referer: HttpUrl | str | None = None
     resource: ResourceModel
     stars: list[StarsModel]
     subject: SubjectModel
-    url: HttpUrl
+    url: HttpUrl | str | None = None
 
     @field_validator("url", mode="before")
     def validate_url(value: str) -> str:
@@ -263,14 +263,14 @@ class ResDataModel(BaseModel):
 class ItemJsonDetailsModel(BaseModel):
     """Whole extracted item details from json-formatted data"""
 
-    nuxt_i18n_meta: dict = Field(alias="nuxt-i18n-meta")
+    nuxt_i18n_meta: dict | None = Field(None, alias="nuxt-i18n-meta")
     resData: ResDataModel
-    utmSource: str
-    showNotFound: bool
+    utmSource: str = ""
+    showNotFound: bool = False
     # midForYou: list
-    midReviewsList: list[PostListItemModel]
-    pcShowSliderNav: bool
-    detailShowSliderNav: bool
-    QRCode: str
-    activeSidebar: str
-    playSourceTabType: int
+    midReviewsList: list[PostListItemModel] = []
+    pcShowSliderNav: bool = False
+    detailShowSliderNav: bool = False
+    QRCode: str | None = None
+    activeSidebar: str | None = None
+    playSourceTabType: int = 0
