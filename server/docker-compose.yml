@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    restart: always
+    environment:
+      - MOVIEBOX_API_HOST=movieboxapp.in
+    networks:
+      - moviebox-network
+
+  caddy:
+    image: caddy:latest
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    networks:
+      - moviebox-network
+
+networks:
+  moviebox-network:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
