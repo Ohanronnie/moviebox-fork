@@ -7,7 +7,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - MOVIEBOX_API_HOST=movieboxapp.in
+      - MOVIEBOX_API_HOST=h5.aoneroom.com
     networks:
       - moviebox-network
 
