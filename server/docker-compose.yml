@@ -4,6 +4,8 @@ services:
   app:
     build: .
     restart: unless-stopped
+    ports:
+      - "8000:8000"
     environment:
       - MOVIEBOX_API_HOST=movieboxapp.in
     networks:
@@ -13,8 +15,8 @@ services:
     image: caddy:latest
     restart: unless-stopped
     ports:
-      - "3000:80"
-      - "3001:443"
+      - "80:80"
+      - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
