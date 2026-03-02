@@ -11,7 +11,11 @@ from httpx._types import (
     TimeoutTypes,
 )
 
-from moviebox_api.constants import DOWNLOAD_REQUEST_HEADERS
+from moviebox_api.constants import (
+    DEFAULT_REQUEST_HEADERS,
+    DOWNLOAD_REQUEST_HEADERS,
+    SELECTED_HOST,
+)
 from moviebox_api.exceptions import EmptyResponseError
 from moviebox_api.helpers import (
     get_absolute_url,
@@ -33,7 +37,7 @@ class Session:
 
     def __init__(
         self,
-        headers: ProxyTypes | None = DOWNLOAD_REQUEST_HEADERS,
+        headers: ProxyTypes | None = DEFAULT_REQUEST_HEADERS,
         cookies: CookieTypes | None = request_cookies,
         timeout: TimeoutTypes = DEFAULT_TIMEOUT_CONFIG,
         proxy: ProxyTypes | None = None,
@@ -169,10 +173,32 @@ class Session:
         """
         if not self.__moviebox_app_info_fetched:
             # First run probably
-            await self._fetch_app_info()
+            try:
+                await self._fetch_app_info()
+            except Exception:
+                # If app info fetch fails, we still want to try to get cookies from homepage
+                await self._client.get("/")
+            
             self.__moviebox_app_info_fetched = True
 
-        return self._client.cookies.get("account") is not None
+        # Search for account cookie across all domains in the jar
+        account_cookie = None
+        current_host_has_it = False
+        
+        for cookie in self._client.cookies.jar:
+            if cookie.name == "account":
+                account_cookie = cookie.value
+                if cookie.domain == SELECTED_HOST:
+                    current_host_has_it = True
+                    break
+        
+        if account_cookie:
+            if not current_host_has_it:
+                # Force apply this cookie for the current host to ensure propagation
+                self._client.cookies.set("account", account_cookie, domain=SELECTED_HOST)
+            return True
+
+        return False
 
     async def _fetch_app_info(self) -> MovieboxAppInfo:
         """Fetches the moviebox app info but the main goal is to get the essential
