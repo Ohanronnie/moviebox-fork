@@ -8,23 +8,21 @@ ENV UV_COMPILE_BYTECODE=1 \
 # Set working directory
 WORKDIR /app
 
-# Install dependencies first for better caching
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    uv sync --frozen --no-install-project --no-dev
-
-# Copy the source code and backend files
-COPY src /app/src
-COPY backend /app/backend
+# Copy essential files first
 COPY pyproject.toml uv.lock /app/
 
+# Install dependencies normally (no BuildKit mount)
+RUN uv sync --frozen --no-install-project --no-dev
+
+# Copy the rest of the source code
+COPY src /app/src
+COPY backend /app/backend
+
 # Sync the project itself
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev
 
 # Expose port 8000
 EXPOSE 8000
 
-# Command to run the application (no reload in production)
+# Command to run the application
 CMD ["uv", "run", "uvicorn", "backend.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
