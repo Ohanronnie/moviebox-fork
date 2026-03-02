@@ -8,8 +8,8 @@ ENV UV_COMPILE_BYTECODE=1 \
 # Set working directory
 WORKDIR /app
 
-# Copy essential files first
-COPY pyproject.toml uv.lock /app/
+# Copy essential files first (including metadata files referenced in pyproject.toml)
+COPY pyproject.toml uv.lock README.md LICENSE /app/
 
 # Install dependencies normally (no BuildKit mount)
 RUN uv sync --frozen --no-install-project --no-dev
